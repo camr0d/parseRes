@@ -1,9 +1,13 @@
 import asyncio
 from pyrogram import Client
+import requests
 
 from main_window import Ui_MainWindow
 from PyQt5 import QtWidgets
 import sys
+
+# переменные 
+
 
 class HomeScreen(QtWidgets.QMainWindow):
     def __init__(self):
@@ -16,14 +20,49 @@ class HomeScreen(QtWidgets.QMainWindow):
         self.app = Client("my_account")
         
         # Инициализация действий кнопок
-        self.ui.pushButton.clicked.connect(self.calculate)
-        
-    # Подсчет количества просмотров и участников указанного сообщества
-    def calculate(self) -> None:
+        self.ui.pushButton.clicked.connect(self.calculateTG)
+        self.ui.pushButtonVK.clicked.connect(self.calculateVK)
+    
+    # Подсчет количества просмотров и участников указанного сообщества в VK
+    def calculateVK(self) -> None:
+        average_view = 0
+        chat_id = self.ui.linkVK.text()
+        chat_id = chat_id[chat_id.rfind('/') + 1:len(chat_id)]
+        if (self.ui.le_countMessageVK.text() == ""):
+            return
+        count_elements = int(self.ui.le_countMessageVK.text()) + 1
+        response = requests.get('https://api.vk.com/method/wall.get',
+                                params={'access_token': TOKEN_USER,
+                                        'v': "5.131",
+                                        'domain': chat_id,
+                                        'count': count_elements,
+                                        'filter': str('owner')})
+        data = response.json()['response']['items']
+        for post in data:
+            try:
+                if (post["is_pinned"]):
+                    count_elements -= 1
+                    continue
+            except:
+                average_view += post["views"]["count"]
+        if (count_elements != 0):
+            average_view = int(average_view / count_elements)
+        response = requests.get('https://api.vk.com/method/groups.getById',
+                                params={'access_token': TOKEN_USER,
+                                        'v': "5.131",
+                                        'group_id': chat_id,
+                                        'fields': str('members_count')})
+        self.ui.le_aberageViewVK.setText(str(average_view))
+        self.ui.le_countUserVK.setText(str(response.json()['response'][0]['members_count']))
+    
+    # Подсчет количества просмотров и участников указанного сообщества в Telegram
+    def calculateTG(self) -> None:
         average_view = 0
         countMembers = 0
         chat_id = self.ui.linkTelegram.text()
         chat_id = chat_id[chat_id.rfind('/') + 1:len(chat_id)]
+        if (self.ui.le_countMessage.text() == ""):
+            return
         count_elements = int(self.ui.le_countMessage.text())
         with self.app:
             countMembers = self.app.get_chat(chat_id).members_count
